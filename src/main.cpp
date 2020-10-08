@@ -11,6 +11,8 @@
 #include <MAX30105.h>
 #include <heartRate.h>
 
+
+
 //使能标志位
 bool ECG_EN;
 bool TEMP_EN;
@@ -42,11 +44,13 @@ BLEServer *pServer;
 BLECharacteristic *ecgCharacteristic; //创建一个BLE特性ecgCharacteristic
 BLECharacteristic *tempCharacteristic; //创建一个BLE特性ecgCharacteristic
 BLECharacteristic *HRateCharacteristic; //创建一个BLE特性ecgCharacteristic
+BLECharacteristic *SPO2Characteristic; //创建一个BLE特性ecgCharacteristic
 
 bool deviceConnected = false;       //连接否标志位
 uint8_t txValue = 0;                //TX的值
 long lastMsg = 0;                   //存放时间的变量
 String rxload = "Blank Value";      //RX的预置值
+
 //BLE UUID
 #define ECG_SERVICE_UUID              "0001181C-0000-1000-8000-00805F9B34FB" // UART service UUID
 #define ECG_CHARACTERISTIC_UUID_RX    "0002181C-0000-1000-8000-00805F9B34FB"
@@ -57,18 +61,26 @@ String rxload = "Blank Value";      //RX的预置值
 #define HRATE_SERVICE_UUID            "00072A37-0000-1000-8000-00805F9B34FB" // UART service UUID
 #define HRate_CHARACTERISTIC_UUID_RX  "00082A37-0000-1000-8000-00805F9B34FB"
 #define HRate_CHARACTERISTIC_UUID_TX  "00092A37-0000-1000-8000-00805F9B34FB"
+#define SPO2_SERVICE_UUID             "00102A37-0000-1000-8000-00805F9B34FB" // UART service UUID
+#define SPO2_CHARACTERISTIC_UUID_RX   "00112A37-0000-1000-8000-00805F9B34FB"
+#define SPO2_CHARACTERISTIC_UUID_TX   "00122A37-0000-1000-8000-00805F9B34FB"
 //计时器
 Ticker ECG_SendTicker;
 Ticker TEMP_SendTicker;
 Ticker HRate_SendTicker;
+Ticker SPO2_SendTicker;
+
 //发送变量
 String ecgValue ;
 String tempValue;
 String HRateValue;
+String SPO2Value;
+
 //采样间隔（计时器）
 uint32_t ECG_Sample=50;//采样间隔 ms
 uint32_t TEMP_Sample=1000;//采样间隔 ms
 uint32_t HRate_Sample=30;
+uint32_t SPO2_Sample=30;
 
 //服务器回调
 class MyServerCallbacks : public BLEServerCallbacks
@@ -157,6 +169,11 @@ void HRate_TickerCallback(){
   // }
 }
 
+//血氧计时器回调
+void SPO2_TickerCallback(){
+  SPO2Characteristic->setValue(SPO2Value.c_str());
+  SPO2Characteristic->notify();        
+}
 //心电特性回调
 class ecgCallbacks : public BLECharacteristicCallbacks
 {
@@ -172,12 +189,10 @@ class ecgCallbacks : public BLECharacteristicCallbacks
       // }
 
       if(ECG_rxValue=="start"){
-        ECG_EN = true;HRATE_EN=false;
         ECG_SendTicker.attach_ms(ECG_Sample,ECG_TickerCallback);
         Serial.print("ECG Notify have started.");
       }
       else if(ECG_rxValue=="stop"){
-        ECG_EN=false;
         ECG_SendTicker.detach();
         Serial.print("ECG Notify have stopped.");
       }
@@ -248,6 +263,35 @@ class HRateCallbacks : public BLECharacteristicCallbacks
   }
 };
 
+//血氧特性回调
+class SPO2Callbacks : public BLECharacteristicCallbacks
+{
+  void onWrite(BLECharacteristic *SPO2Characteristic)
+  {
+    std::string SPO2_rxValue = SPO2Characteristic->getValue();
+    if (SPO2_rxValue.length() > 0){
+      rxload = "";
+
+      if(SPO2_rxValue=="start"){
+        // HRATE_EN=true;ECG_EN=false;
+        SPO2_SendTicker.attach_ms(SPO2_Sample,SPO2_TickerCallback);
+        Serial.print("SPO2 Notify have started.");
+      }
+      else if(SPO2_rxValue=="stop"){
+        // SPO2_EN=false;
+        SPO2_SendTicker.detach();
+        Serial.print("SPO2 Notify have stopped.");
+      }
+      else if(SPO2_rxValue=="disconnect"){
+        pServer->disconnect(0);
+        Serial.print("0 have disconnected.");
+      }
+
+      Serial.println("");
+    }
+  }
+};
+
 //启动BLE
 void setupBLE(String BLEName)
 {
@@ -258,6 +302,7 @@ void setupBLE(String BLEName)
   BLEService *ECGService = pServer->createService(ECG_SERVICE_UUID); 
   BLEService *TEMPService = pServer->createService(TEMP_SERVICE_UUID); 
   BLEService *HRATEService = pServer->createService(HRATE_SERVICE_UUID); 
+  BLEService *SPO2Service = pServer->createService(SPO2_SERVICE_UUID); 
 
   //心电特征设置
   ecgCharacteristic = ECGService->createCharacteristic(ECG_CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_NOTIFY|BLECharacteristic::PROPERTY_READ); 
@@ -280,9 +325,17 @@ void setupBLE(String BLEName)
   BLECharacteristic *HRateCharacteristic = HRATEService->createCharacteristic(HRate_CHARACTERISTIC_UUID_RX, BLECharacteristic::PROPERTY_WRITE);
   HRateCharacteristic->setCallbacks(new HRateCallbacks());
 
+  //心率特征设置
+  SPO2Characteristic = SPO2Service->createCharacteristic(SPO2_CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_NOTIFY|BLECharacteristic::PROPERTY_READ); 
+  SPO2Characteristic->addDescriptor(new BLE2902());
+  SPO2Characteristic->addDescriptor(new BLE2904());
+  BLECharacteristic *SPO2Characteristic = SPO2Service->createCharacteristic(SPO2_CHARACTERISTIC_UUID_RX, BLECharacteristic::PROPERTY_WRITE);
+  SPO2Characteristic->setCallbacks(new SPO2Callbacks());
+
   ECGService->start();                  //开启服务
   TEMPService->start();                  //开启服务
   HRATEService->start();                  //开启服务
+  SPO2Service->start();                  //开启服务
   pServer->getAdvertising()->start(); //服务器开始广播
   Serial.println("Waiting a client connection to notify...");
 }
@@ -301,6 +354,7 @@ void setupHRate(){
   HRate.setPulseAmplitudeRed(0x0A); //Turn Red LED to low to indicate sensor is running
   HRate.setPulseAmplitudeGreen(0); //Turn off Green LED
 }
+
 void setup()
 {
   Serial.begin(115200);
