@@ -6,7 +6,7 @@
 #include <MAX30105.h>
 #include <heartRate.h>
 
-/*
+/**
 * @brief 外围数据采集对象。采集外部信号，并提供一个数据接口供ESP32进行数据读取。
 */
 class SensorDataCollectorBase
@@ -19,7 +19,7 @@ private:
 };
 
 /**
- * @brief AD8236模块数据采集类
+ * @brief AD8236模块（ECG）数据采集类
  * @param PINout    AD8236接ESP32模块引脚 
  */
 class ECG_SensorDataCollector:public SensorDataCollectorBase
@@ -32,6 +32,10 @@ private:
     void setup();
 };
 
+/**
+ * @brief 温度模块数据采集器
+ * 
+ */
 class TEMP_SensorDataCollector:public SensorDataCollectorBase
 {
     int m_PINOut;
@@ -46,6 +50,10 @@ private:
     void setup();
 };
 
+/**
+ * @brief MAX30102模块数据采集器
+ * 
+ */
 class MAX30102_SensorDataCollector:public SensorDataCollectorBase
 {
     MAX30105 m_max30105;
