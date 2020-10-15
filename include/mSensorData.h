@@ -6,6 +6,8 @@
 #include <MAX30105.h>
 #include <heartRate.h>
 
+// ! TickerCallback函数是一个需要定制化的函数，因为这个计时器回调函数是各个传感器用来采样的函数，每个函数的方法必定不一样，
+
 /**
 * @brief 外围数据采集对象。采集外部信号，并提供一个数据接口供ESP32进行数据读取。
 */
@@ -13,6 +15,7 @@ class SensorDataCollectorBase
 {
 public:
     virtual String getData()=0;
+    Ticker* m_p_s_Ticker = new Ticker;
 
 private:
     virtual void setup()=0;

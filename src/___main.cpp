@@ -111,6 +111,7 @@ void TEMP_TickerCallback(){
   if(TEMP_EN){
     temp.requestTemperatures();
     tempValue = String(temp.getTempCByIndex(0));
+    // !核心数值应该是这个 xxValue，TickerCallback函数主要就是运行读值函数，然后把读取的值放进Characteristic，然后发送出去。所以其实还是这个方案，即只需要把getData()函数传进来就行了。
     tempCharacteristic->setValue(tempValue.c_str());
     tempCharacteristic->notify();
     // Serial.println(tempValue);

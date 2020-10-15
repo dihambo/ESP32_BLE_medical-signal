@@ -39,7 +39,8 @@ public:
 
     BLEServer *m_p_BLEServer;
 
-    void AddService();
+    void addService(std::string ServiceUUID);
+    void addCharacteristic(std::string ServiceUUID, BLECharacteristic* pCharacteristic);
 };
 
 BLEDeviceBase::BLEDeviceBase(std::string BLE_name){
@@ -48,6 +49,11 @@ BLEDeviceBase::BLEDeviceBase(std::string BLE_name){
     m_p_BLEServer->setCallbacks(new BLEServerCallbacksBase());
 }
 
-void BLEDevice::AddService(BLEService* service){
+void BLEDeviceBase::addService(std::string ServiceUUID){
+    m_p_BLEServer->createService(ServiceUUID);
+}
 
+void BLEDeviceBase::addCharacteristic(std::string ServiceUUID, BLECharacteristic* pCharacteristic){
+    BLEService* tempService = m_p_BLEServer->getServiceByUUID(ServiceUUID);
+    tempService->addCharacteristic(pCharacteristic);
 }
